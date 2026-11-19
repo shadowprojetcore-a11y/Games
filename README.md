@@ -7,7 +7,7 @@ Un jeu de plateforme rétro 2D inspiré de Mario, en HTML5/JavaScript pur (aucun
 | Touche | Action |
 |---|---|
 | `←` `→` | Se déplacer |
-| `↑` ou `Espace` | Sauter (maintiens pour sauter plus haut) |
+| `↑` ou `Espace` | Sauter (maintiens pour sauter plus haut) — **2e appui en l'air : double saut !** |
 | `↑` `↓` + `Entrée` | Naviguer dans les menus |
 | `Échap` | Pause en cours de jeu |
 | `Entrée` | Valider / revenir au menu |
@@ -23,7 +23,12 @@ Un jeu de plateforme rétro 2D inspiré de Mario, en HTML5/JavaScript pur (aucun
   - **RECOMMENCER LE NIVEAU** — relancer le niveau courant
   - **MENU PRINCIPAL** — revenir au menu
 
-- **3 niveaux** avec difficulté croissante (Monde 1-1, 1-2, 1-3)
+- **3 niveaux** avec difficulté croissante — **déblocage progressif** : termine un niveau pour débloquer le suivant au menu (sauvegardé en localStorage) ; après chaque niveau, retour au menu
+- **Double saut** : ré-appuie sur ↑ / Espace en l'air
+- **Blocs à pouvoirs** (frappe-les par en dessous) :
+  - `?` → pièce (+100 pts)
+  - `★` → **étoile d'invincibilité (9 s, avec jauge)** : arc-en-ciel, écrase TOUS les ennemis au contact (même les Spinys) et détruit les boules de feu ; les boss restent dangereux mais ne peuvent pas te toucher
+  - `♥` → **+1 vie** (champignon 1-UP)
 - **Ennemis redessinés** : Goombas, Koopas (verts, rapides) et **Spinys** (rouges à pointes — ⚠ impossibles à écraser, les éviter !)
 - **Mini-boss en fin de chaque niveau**, barre de 5 PV, arène verrouillée :
   - 👑 **ROI GOOMBA** — crache des boules de feu, saute

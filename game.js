@@ -22,6 +22,8 @@ function buildLevel(def) {
     platform(x, y, w) { for (let i = 0; i < w; i++) set(x + i, y, 'X'); },
     brick(x, y, w = 1) { for (let i = 0; i < w; i++) set(x + i, y, 'B'); },
     q(x, y) { set(x, y, '?'); },
+    star(x, y) { set(x, y, 'S'); },
+    life(x, y) { set(x, y, 'L'); },
     coin(x, y) { set(x, y, 'o'); },
     coins(x, y, n) { for (let i = 0; i < n; i++) set(x + i, y, 'o'); },
     pipe(x, h) { for (let i = 0; i < h; i++) { set(x, 13 - i, 'P'); set(x + 1, 13 - i, 'P'); } },
@@ -50,7 +52,7 @@ const LEVEL_DEFS = [
     build(a) {
       a.q(16, 10);
       a.brick(21, 10, 2); a.q(23, 10); a.brick(24, 10, 2);
-      a.q(23, 6); a.coins(21, 6, 5);
+      a.coins(21, 6, 2); a.star(23, 6); a.coin(24, 6); a.coin(25, 6);
       a.pipe(30, 2); a.pipe(40, 3);
       a.enemy(24); a.enemy(36); a.enemy(46); a.enemy(52, 'spiny');
       a.gap(56, 3);
@@ -60,7 +62,7 @@ const LEVEL_DEFS = [
       a.enemy(70); a.enemy(76, 'koopa');
       a.gap(82, 4);
       a.coins(82, 10, 4);
-      a.brick(90, 10, 5); a.q(92, 10); a.enemy(93);
+      a.brick(90, 10, 5); a.life(92, 10); a.enemy(93);
       a.coins(90, 6, 5);
       a.stairs(100, 4); a.stairsDown(104, 4);
       a.flag(128);
@@ -74,13 +76,13 @@ const LEVEL_DEFS = [
       a.enemy(16); a.enemy(26);
       a.platform(28, 10, 4); a.coins(29, 9, 2); a.enemy(30, 'goomba', 9);
       a.gap(36, 4);
-      a.q(44, 10); a.brick(45, 10, 3); a.q(47, 6);
+      a.q(44, 10); a.brick(45, 10, 3); a.star(47, 6);
       a.enemy(48); a.enemy(54, 'koopa');
       a.pipe(58, 3); a.enemy(62, 'spiny'); a.gap(66, 4);
       a.platform(70, 9, 5); a.coins(70, 8, 5);
       a.platform(78, 7, 4); a.coins(78, 6, 4); a.enemy(79, 'goomba', 6);
       a.enemy(86); a.enemy(90); a.enemy(94, 'koopa');
-      a.brick(98, 10, 4); a.q(100, 10);
+      a.brick(98, 10, 4); a.life(100, 10);
       a.gap(104, 5); a.platform(104, 9, 2); a.platform(108, 7, 2);
       a.coins(104, 8, 2); a.coins(108, 6, 2);
       a.enemy(114); a.q(116, 10);
@@ -96,13 +98,13 @@ const LEVEL_DEFS = [
       a.gap(22, 4); a.coins(22, 10, 4);
       a.platform(26, 8, 3); a.enemy(27, 'goomba', 7);
       a.gap(32, 4); a.platform(34, 7, 3); a.coins(34, 6, 3);
-      a.brick(42, 10, 3); a.q(43, 10);
+      a.brick(42, 10, 3); a.life(43, 10);
       a.enemy(48); a.enemy(52); a.enemy(56, 'spiny');
       a.gap(60, 5); a.platform(60, 10, 2); a.platform(64, 8, 2);
       a.coins(60, 9, 2); a.coins(64, 7, 2);
       a.pipe(72, 2); a.enemy(77); a.enemy(80);
       a.brick(84, 10, 2); a.q(86, 10); a.brick(88, 10, 2);
-      a.coins(84, 6, 6); a.q(86, 6);
+      a.coins(84, 6, 6); a.star(86, 6);
       a.gap(94, 3); a.gap(100, 3); a.gap(106, 4);
       a.platform(96, 9, 2); a.coins(96, 8, 2);
       a.enemy(112, 'koopa'); a.enemy(116); a.enemy(119, 'spiny');
@@ -124,9 +126,28 @@ let levelIndex = 0;
 let level = null;
 let player, camX = 0, camY = 0;
 let score = 0, coinCount = 0, lives = 3;
-const MENU_ITEMS = ['JOUER', 'COMMANDES', 'QUITTER'];
 const PAUSE_ITEMS = ['REPRENDRE', 'RECOMMENCER LE NIVEAU', 'MENU PRINCIPAL'];
 let menuIndex = 0, pauseIndex = 0;
+let unlockedLevels = 1, lockMsgT = 0;
+let powerups = [];
+try {
+  const saved = parseInt(localStorage.getItem('mario2d_unlocked'), 10);
+  if (saved >= 1) unlockedLevels = Math.min(saved, LEVEL_DEFS.length);
+} catch (err) { /* localStorage indisponible */ }
+function unlockLevel(n) {
+  if (n > unlockedLevels) {
+    unlockedLevels = Math.min(n, LEVEL_DEFS.length);
+    try { localStorage.setItem('mario2d_unlocked', String(unlockedLevels)); } catch (err) { /* no-op */ }
+  }
+}
+function menuSize() { return LEVEL_DEFS.length + 2; }
+function menuLabels() {
+  const labels = [];
+  for (let i = 0; i < LEVEL_DEFS.length; i++) labels.push({ txt: 'NIVEAU ' + (i + 1), locked: i + 1 > unlockedLevels });
+  labels.push({ txt: 'COMMANDES', locked: false });
+  labels.push({ txt: 'QUITTER', locked: false });
+  return labels;
+}
 let particles = [];
 let stateTimer = 0, frame = 0;
 let persistent = { coins: new Set(), usedQ: new Set(), deadEnemies: new Set(), bossHp: null, checkpoint: null };
@@ -141,8 +162,8 @@ addEventListener('keydown', (e) => {
   keys[k] = true;
   audioInit();
   if (state === 'menu') {
-    if (k === 'ArrowUp') { menuIndex = (menuIndex + MENU_ITEMS.length - 1) % MENU_ITEMS.length; sfx.bump(); }
-    else if (k === 'ArrowDown') { menuIndex = (menuIndex + 1) % MENU_ITEMS.length; sfx.bump(); }
+    if (k === 'ArrowUp') { menuIndex = (menuIndex + menuSize() - 1) % menuSize(); sfx.bump(); }
+    else if (k === 'ArrowDown') { menuIndex = (menuIndex + 1) % menuSize(); sfx.bump(); }
     else if (k === 'Enter') menuSelect();
   } else if (state === 'help') {
     if (k === 'Enter' || k === 'Escape') state = 'menu';
@@ -165,10 +186,15 @@ addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 function clearKeys() { for (const k in keys) keys[k] = false; }
 
 function menuSelect() {
-  if (menuIndex === 0) {
-    score = 0; coinCount = 0; lives = 3;
-    startLevel(0);
-  } else if (menuIndex === 1) {
+  if (menuIndex < LEVEL_DEFS.length) {
+    if (menuIndex + 1 > unlockedLevels) {
+      lockMsgT = 120;
+      sfx.bump();
+    } else {
+      score = 0; coinCount = 0; lives = 3;
+      startLevel(menuIndex);
+    }
+  } else if (menuIndex === LEVEL_DEFS.length) {
     state = 'help';
   } else {
     try { window.close(); } catch (err) { /* bloqué par le navigateur */ }
@@ -193,7 +219,7 @@ function startLevel(i) {
   level = buildLevel(LEVEL_DEFS[i]);
   persistent = { coins: new Set(), usedQ: new Set(), deadEnemies: new Set(), bossHp: null, checkpoint: null };
   boss = null; bossActive = false; bossDefeated = false;
-  fireballs = []; waves = [];
+  fireballs = []; waves = []; powerups = [];
   spawnEntities();
   respawnPlayer();
   state = 'playing';
@@ -214,6 +240,7 @@ function respawnPlayer() {
     x: sx * TILE, y: level.start.y * TILE,
     w: 22, h: 30, vx: 0, vy: 0, onGround: false,
     facing: 1, invul: 90, walkT: 0,
+    jumps: 0, jumpHeld: false, powerT: 0,
   };
 }
 
@@ -243,6 +270,8 @@ const sfx = {
   bump: () => beep(140, 0.08, 'square', 0.12),
   die: () => { beep(400, 0.15, 'square', 0.15, -150); setTimeout(() => beep(250, 0.25, 'square', 0.15, -100), 150); },
   flag: () => { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, 0.15, 'square', 0.12), i * 110)); },
+  power: () => { [660, 880, 1100, 1320].forEach((f, i) => setTimeout(() => beep(f, 0.1, 'square', 0.12), i * 60)); },
+  oneUp: () => { [523, 660, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.12, 'triangle', 0.14), i * 90)); },
   fire: () => beep(520, 0.16, 'sawtooth', 0.1, -320),
   bossHit: () => { beep(120, 0.2, 'square', 0.2, -60); setTimeout(() => beep(90, 0.15, 'triangle', 0.18), 90); },
   bossDie: () => { [784, 659, 523, 392, 262].forEach((f, i) => setTimeout(() => beep(f, 0.18, 'square', 0.15), i * 130)); },
@@ -250,7 +279,7 @@ const sfx = {
 };
 
 /* ---------------- Physique ---------------- */
-const SOLIDS = 'XBP?U';
+const SOLIDS = 'XBPS?UL';
 function solidAt(tx, ty) {
   if (ty < 0 || ty >= ROWS) return false;
   if (tx < 0 || tx >= level.width) return true;
@@ -280,14 +309,38 @@ function moveEntity(e) {
   return { hitWall, landed, headHit };
 }
 
-function bumpQuestion(tx, ty) {
+function snapToGround() {
+  const feet = player.y + player.h;
+  const fY = Math.floor(feet / TILE);
+  if (fY < 0 || fY >= ROWS) return false;
+  const over = feet - fY * TILE;
+  if (over <= 0 || over >= 4) return false;
+  if (solidAt(Math.floor((player.x + 2) / TILE), fY) || solidAt(Math.floor((player.x + player.w - 2) / TILE), fY)) {
+    player.y = fY * TILE - player.h;
+    player.vy = 0;
+    return true;
+  }
+  return false;
+}
+
+function bumpBlock(tx, ty) {
   const c = level.tiles[ty][tx];
-  if (c !== '?') return;
-  level.tiles[ty][tx] = 'U';
-  persistent.usedQ.add(tx + ',' + ty);
-  coinCount++; score += 100;
-  sfx.coin();
-  particles.push({ x: tx * TILE + TILE / 2, y: ty * TILE, vy: -3.2, life: 30, text: '+100' });
+  if (c === '?') {
+    level.tiles[ty][tx] = 'U';
+    persistent.usedQ.add(tx + ',' + ty);
+    coinCount++; score += 100;
+    sfx.coin();
+    particles.push({ x: tx * TILE + TILE / 2, y: ty * TILE, vy: -3.2, life: 30, text: '+100' });
+  } else if (c === 'S' || c === 'L') {
+    level.tiles[ty][tx] = 'U';
+    persistent.usedQ.add(tx + ',' + ty);
+    sfx.bump();
+    powerups.push({
+      x: tx * TILE + 4, y: ty * TILE + 8, w: 24, h: 24,
+      kind: c === 'S' ? 'star' : 'life',
+      vx: 0, vy: 0, emerge: 22, dir: 1,
+    });
+  }
 }
 
 /* ---------------- Boss ---------------- */
@@ -425,9 +478,9 @@ function updateBoss() {
   const minX = (level.arenaX - 1) * TILE, maxX = (level.width - 3) * TILE - boss.w;
   if (boss.x < minX) { boss.x = minX; boss.vx = 0; }
   if (boss.x > maxX) { boss.x = maxX; boss.vx = 0; }
-  // contact joueur
+  // contact joueur (l'étoile ne blesse pas le boss, mais protège)
   if (state === 'playing' && boss.invul <= 0 && boss.stun <= 0) {
-    if (rectHit(player, boss)) {
+    if (rectHit(player, boss) && player.powerT <= 0) {
       if (player.vy > 1.5 && player.y + player.h - boss.y < 20) hitBoss();
       else if (player.invul <= 0) die();
     }
@@ -447,16 +500,21 @@ function updateProjectiles() {
       particles.push({ x: f.x + f.w / 2, y: f.y + f.h / 2, vy: -1, life: 15, text: '·' });
       continue;
     }
-    if (state === 'playing' && player.invul <= 0 && rectHit(player, f)) {
+    if (state === 'playing' && rectHit(player, f)) {
       f.dead = true;
-      die();
+      if (player.powerT > 0) {
+        score += 100;
+        particles.push({ x: f.x + 6, y: f.y + 6, vy: -1.5, life: 18, text: '+100' });
+      } else if (player.invul <= 0) {
+        die();
+      }
     }
   }
   fireballs = fireballs.filter((f) => !f.dead);
   for (const wv of waves) {
     wv.x += wv.vx;
     wv.life--;
-    if (state === 'playing' && player.invul <= 0 && rectHit(player, wv)) die();
+    if (state === 'playing' && player.powerT <= 0 && player.invul <= 0 && rectHit(player, wv)) die();
   }
   waves = waves.filter((w) => w.life > 0);
 }
@@ -475,9 +533,10 @@ function die() {
 function levelComplete() {
   if (state !== 'playing') return;
   state = 'flag';
-  stateTimer = 90;
+  stateTimer = 100;
   score += 1000;
   if (bossDefeated) score += 500;
+  unlockLevel(levelIndex + 2);
   sfx.flag();
 }
 
@@ -490,20 +549,32 @@ function updatePlayer() {
   player.vx = Math.max(-maxSpd, Math.min(maxSpd, player.vx));
   if (Math.abs(player.vx) < 0.05) player.vx = 0;
 
-  if ((keys['ArrowUp'] || keys[' ']) && player.onGround) {
+  const jumpHeld = keys['ArrowUp'] || keys[' '];
+  if (jumpHeld && player.onGround) {
     player.vy = jumpVel;
+    player.jumps = 1;
     player.onGround = false;
     sfx.jump();
+  } else if (jumpHeld && !player.onGround && !player.jumpHeld && player.jumps < 2) {
+    player.vy = jumpVel * 0.92;
+    player.jumps = 2;
+    sfx.jump();
+    particles.push({ x: player.x + player.w / 2, y: player.y + player.h, vy: 1.2, life: 14, text: '✧' });
   }
+  player.jumpHeld = jumpHeld;
   player.vy = Math.min(player.vy + gravity, 14);
 
   const res = moveEntity(player);
-  if (res.landed) player.onGround = true;
-  else if (player.vy !== 0) player.onGround = false;
-  if (res.headHit) bumpQuestion(res.headHit.tx, res.headHit.ty);
+  if (res.landed) { player.onGround = true; player.jumps = 0; }
+  else if (player.vy !== 0) {
+    if (player.vy > 0 && snapToGround()) { player.onGround = true; player.jumps = 0; }
+    else player.onGround = false;
+  }
+  if (res.headHit) bumpBlock(res.headHit.tx, res.headHit.ty);
 
   if (Math.abs(player.vx) > 0.3 && player.onGround) player.walkT += Math.abs(player.vx) * 0.06;
   player.invul = Math.max(0, player.invul - 1);
+  player.powerT = Math.max(0, player.powerT - 1);
 
   const l = Math.floor(player.x / TILE), r = Math.floor((player.x + player.w - 1) / TILE);
   const tp = Math.floor(player.y / TILE), bt = Math.floor((player.y + player.h - 1) / TILE);
@@ -530,6 +601,38 @@ function updatePlayer() {
 }
 
 /* ---------------- Ennemis ---------------- */
+function updatePowerups() {
+  for (const p of powerups) {
+    if (p.emerge > 0) {
+      p.emerge--;
+      p.y -= 1.1;
+      if (p.emerge === 0) p.vx = (p.kind === 'star' ? 2.2 : 1.2) * p.dir;
+      continue;
+    }
+    p.vx = (p.kind === 'star' ? 2.2 : 1.2) * p.dir;
+    p.vy = Math.min(p.vy + 0.5, 12);
+    const res = moveEntity(p);
+    if (res.hitWall) p.dir *= -1;
+    if (res.landed && p.kind === 'star') p.vy = -8.5;
+    if (p.y > H + 60) { p.gone = true; continue; }
+    if (state === 'playing' && rectHit(player, p)) {
+      p.gone = true;
+      if (p.kind === 'star') {
+        player.powerT = 540;
+        score += 500;
+        sfx.power();
+        particles.push({ x: p.x + 12, y: p.y, vy: -2, life: 45, text: '★ ÉTOILE !' });
+      } else {
+        lives++;
+        score += 100;
+        sfx.oneUp();
+        particles.push({ x: p.x + 12, y: p.y, vy: -2, life: 45, text: '+1 VIE !' });
+      }
+    }
+  }
+  powerups = powerups.filter((p) => !p.gone);
+}
+
 function updateEnemies() {
   for (const e of level.enemies) {
     if (persistent.deadEnemies.has(e.idx)) continue;
@@ -547,14 +650,20 @@ function updateEnemies() {
 
     if (state !== 'playing') continue;
     if (rectHit(player, e)) {
-      const canStomp = e.type !== 'spiny' && player.vy > 1.5 && player.y + player.h - e.y < 18;
-      if (canStomp) {
+      if (player.powerT > 0) {
+        e.dead = true; e.squash = 0;
+        score += 200; sfx.stomp();
+        particles.push({ x: e.x + e.w / 2, y: e.y, vy: -2, life: 25, text: '+200' });
+      } else {
+        const canStomp = e.type !== 'spiny' && player.vy > 1.5 && player.y + player.h - e.y < 18;
+        if (canStomp) {
         e.dead = true; e.squash = 0;
         player.vy = -8.5;
         score += 200; sfx.stomp();
         particles.push({ x: e.x + e.w / 2, y: e.y, vy: -2, life: 25, text: '+200' });
       } else if (player.invul <= 0) {
         die();
+      }
       }
     }
   }
@@ -573,6 +682,7 @@ function update() {
   frame++;
   shakeT = Math.max(0, shakeT - 1);
   if (state === 'menu' || state === 'help' || state === 'quit' || state === 'paused') {
+    if (state === 'menu' && lockMsgT > 0) lockMsgT--;
     return;
   }
   if (state === 'playing' || state === 'flag') {
@@ -589,6 +699,7 @@ function update() {
     if (!boss && !bossDefeated && level.boss && player.x > (level.arenaX + 1) * TILE) activateBoss();
     updatePlayer();
     updateEnemies();
+    updatePowerups();
     updateBoss();
     updateProjectiles();
   } else if (state === 'dead') {
@@ -600,7 +711,7 @@ function update() {
   } else if (state === 'flag') {
     stateTimer--;
     if (stateTimer <= 0) {
-      if (levelIndex + 1 < LEVEL_DEFS.length) startLevel(levelIndex + 1);
+      if (levelIndex + 1 < LEVEL_DEFS.length) state = 'menu';
       else state = 'win';
     }
   }
@@ -616,6 +727,9 @@ function drawPlayer() {
   const air = !player.onGround;
   const swing = run ? Math.sin(player.walkT) : 0;
   const hx = f > 0 ? 1 : -1;
+  const starred = player.powerT > 0;
+  const STAR_COLORS = ['#e52521', '#ff8c00', '#ffd700', '#3cb043', '#1e90ff', '#9b59b6'];
+  const cIdx = Math.floor(frame / 3) % STAR_COLORS.length;
 
   // chaussures
   ctx.fillStyle = '#5a2d00';
@@ -627,10 +741,10 @@ function drawPlayer() {
     ctx.fillRect(px + 11 - swing * 4, py + 26, 9, 4);
   }
   // salopette
-  ctx.fillStyle = '#2b3aa5';
+  ctx.fillStyle = starred ? STAR_COLORS[(cIdx + 3) % STAR_COLORS.length] : '#2b3aa5';
   ctx.fillRect(px + 3, py + 13, 16, 11);
   // bretelles / torse
-  ctx.fillStyle = '#e52521';
+  ctx.fillStyle = starred ? STAR_COLORS[cIdx] : '#e52521';
   ctx.fillRect(px + 3, py + 11, 16, 3);
   ctx.fillRect(px + 6, py + 13, 2, 4);
   ctx.fillRect(px + 14, py + 13, 2, 4);
@@ -665,7 +779,7 @@ function drawPlayer() {
   ctx.fillStyle = '#5a2d00';
   ctx.fillRect(px + (f > 0 ? 11 : 4), py + 10, 8, 3);
   // casquette
-  ctx.fillStyle = '#e52521';
+  ctx.fillStyle = starred ? STAR_COLORS[cIdx] : '#e52521';
   ctx.fillRect(px + 4, py, 16, 4);
   ctx.fillRect(px + (f > 0 ? 15 : 0), py + 2, 8, 3);
   // embleme "M"
@@ -969,17 +1083,20 @@ function drawTile(c, x, y, tx, ty) {
       ctx.moveTo(px + TILE / 2, py); ctx.lineTo(px + TILE / 2, py + TILE / 2);
       ctx.stroke();
       break;
-    case '?': {
+    case '?':
+    case 'S':
+    case 'L': {
       const pulse = 0.5 + 0.5 * Math.sin(frame * 0.1);
-      ctx.fillStyle = `rgb(240, ${Math.round(170 + pulse * 40)}, 30)`;
+      const baseCol = c === '?' ? 170 : c === 'S' ? 150 : 130;
+      ctx.fillStyle = `rgb(${Math.round(200 + pulse * 40)}, ${Math.round(baseCol + pulse * 40)}, 30)`;
       ctx.fillRect(px, py, TILE, TILE);
       ctx.strokeStyle = '#a05000';
       ctx.lineWidth = 2;
       ctx.strokeRect(px + 1, py + 1, TILE - 2, TILE - 2);
-      ctx.fillStyle = '#7a3a00';
+      ctx.fillStyle = c === 'S' ? '#fff' : '#7a3a00';
       ctx.font = 'bold 20px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('?', px + TILE / 2, py + 23);
+      ctx.fillText(c === '?' ? '?' : c === 'S' ? '★' : '♥', px + TILE / 2, py + 23);
       break;
     }
     case 'U':
@@ -1050,11 +1167,59 @@ function drawTiles() {
   if (level.flagX >= c0 - 2 && level.flagX <= c1 + 2) drawFlag();
 }
 
+function drawPowerups() {
+  for (const p of powerups) {
+    const px = p.x - camX, py = p.y - camY;
+    if (p.kind === 'star') {
+      ctx.save();
+      ctx.translate(px + 12, py + 12);
+      ctx.rotate(Math.sin(frame * 0.1) * 0.3);
+      ctx.fillStyle = Math.floor(frame / 4) % 2 === 0 ? '#ffd700' : '#ffec8b';
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const r = i % 2 === 0 ? 13 : 5.5;
+        const ang = -Math.PI / 2 + (i * Math.PI) / 5;
+        const fx = Math.cos(ang) * r, fy = Math.sin(ang) * r;
+        if (i === 0) ctx.moveTo(fx, fy); else ctx.lineTo(fx, fy);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#000';
+      ctx.fillRect(-4, -2, 2, 3);
+      ctx.fillRect(2, -2, 2, 3);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = '#2fbf3f';
+      ctx.beginPath();
+      ctx.ellipse(px + 12, py + 9, 12, 9, 0, Math.PI, 0);
+      ctx.fill();
+      ctx.fillRect(px, py + 9, 24, 4);
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(px + 7, py + 6, 3, 0, Math.PI * 2);
+      ctx.arc(px + 17, py + 7, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f5e0c0';
+      ctx.fillRect(px + 4, py + 13, 16, 11);
+      ctx.fillStyle = '#000';
+      ctx.fillRect(px + 8, py + 17, 2, 4);
+      ctx.fillRect(px + 14, py + 17, 2, 4);
+    }
+  }
+}
+
 function drawHUD() {
   ctx.font = 'bold 18px monospace';
   ctx.textAlign = 'left';
   outlineText(`SCORE ${String(score).padStart(6, '0')}`, 20, 30);
   outlineText(`PIÈCES x${String(coinCount).padStart(2, '0')}`, 20, 56);
+  if (player && player.powerT > 0) {
+    outlineText(`★ ${Math.ceil(player.powerT / 60)}s`, 20, 82, 16, '#ffd700');
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(20, 88, 90, 6);
+    ctx.fillStyle = '#ffd700';
+    ctx.fillRect(20, 88, 90 * (player.powerT / 540), 6);
+  }
   ctx.textAlign = 'center';
   outlineText(level.name, W / 2, 30);
   ctx.textAlign = 'right';
@@ -1108,6 +1273,7 @@ function render() {
   if (!level) { ctx.restore(); return; }
   drawTiles();
   for (const e of level.enemies) drawEnemy(e);
+  drawPowerups();
   drawBoss();
   drawFireballs();
   if (state !== 'flag' || Math.floor(frame / 6) % 2 === 0) drawPlayer();
@@ -1122,8 +1288,12 @@ function render() {
   if (state === 'paused') drawPauseScreen();
   if (state === 'dead') outlineText('Aïe !', W / 2, H / 2, 36, '#ff5050');
   if (state === 'gameover') drawCenter('GAME OVER', 'Appuie sur ENTRÉE pour revenir au menu');
-  if (state === 'win') drawCenter('FÉLICITATIONS !', `Score final : ${score} — ENTRÉE pour rejouer`);
-  if (state === 'flag') drawCenter('NIVEAU TERMINÉ !', bossDefeated ? 'Boss vaincu ! +1500 points' : '+1000 points');
+  if (state === 'win') drawCenter('FÉLICITATIONS !', `Tous les niveaux terminés ! Score : ${score} — ENTRÉE pour le menu`);
+  if (state === 'flag') {
+    const last = levelIndex + 1 >= LEVEL_DEFS.length;
+    drawCenter('NIVEAU TERMINÉ !', last ? 'Passage au menu final…' :
+      'Niveau ' + (levelIndex + 2) + ' débloqué au menu !  (+' + (bossDefeated ? '1500' : '1000') + ' pts)');
+  }
 }
 
 function drawMenuMascot(x, y, scale = 2) {
@@ -1144,15 +1314,18 @@ function drawMenuMascot(x, y, scale = 2) {
 
 function drawMenuList(items, index, midY, spacing = 44) {
   items.forEach((item, i) => {
+    const txt = typeof item === 'string' ? item : item.txt;
+    const locked = typeof item === 'object' && item.locked;
     const y = midY + i * spacing;
-    const sel = i === index;
-    if (sel) {
+    const sel = i === index && !locked;
+    if (i === index) {
       const pulse = 0.5 + 0.5 * Math.sin(frame * 0.15);
-      ctx.fillStyle = `rgba(255,215,0,${0.12 + pulse * 0.12})`;
+      ctx.fillStyle = `rgba(255,215,0,${locked ? 0.06 : 0.12 + pulse * 0.12})`;
       ctx.fillRect(W / 2 - 190, y - 30, 380, 42);
-      outlineText('▶', W / 2 - 160, y, 22, '#ffd700');
+      outlineText(locked ? '🔒' : '▶', W / 2 - 160, y, 20, '#ffd700');
     }
-    outlineText(item, W / 2 + 10, y, sel ? 26 : 22, sel ? '#ffd700' : '#fff');
+    outlineText(locked ? txt + ' — verrouillé' : txt, W / 2 + 10, y, sel ? 26 : 22,
+      locked ? '#9a9aa8' : sel ? '#ffd700' : '#fff');
   });
 }
 
@@ -1165,9 +1338,12 @@ function drawMenuScreen() {
   outlineText('3 niveaux — 3 mini-boss de plus en plus féroces', W / 2, 148, 18, '#fff');
   drawMenuMascot(120, H - 180);
   drawMenuMascot(W - 165, H - 180);
-  drawMenuList(MENU_ITEMS, menuIndex, H / 2 + 20);
+  drawMenuList(menuLabels(), menuIndex, 240, 46);
+  if (lockMsgT > 0 && Math.floor(frame / 12) % 2 === 0) {
+    outlineText('Termine le niveau précédent pour le débloquer !', W / 2, H - 60, 17, '#ff8080');
+  }
   if (Math.floor(frame / 30) % 2 === 0) {
-    outlineText('↑ ↓ pour naviguer — ENTRÉE pour valider', W / 2, H - 30, 16);
+    outlineText('↑ ↓ pour naviguer — ENTRÉE pour jouer — finis un niveau pour débloquer le suivant', W / 2, H - 28, 14);
   }
 }
 
@@ -1177,17 +1353,17 @@ function drawHelpScreen() {
   outlineText('COMMANDES', W / 2, 70, 34, '#ffd700');
   const lines = [
     ['← →   se déplacer', '#fff'],
-    ['↑ / ESPACE   sauter (maintiens pour sauter plus haut)', '#fff'],
+    ['↑ / ESPACE   sauter — APPUIE 2 FOIS pour un DOUBLE SAUT !', '#fff'],
     ['ÉCHAP   pause en cours de jeu', '#fff'],
     ['', '#fff'],
-    ['OBJECTIF', '#eaa221'],
-    ['Prends les pièces et les blocs « ? », atteins le drapeau', '#fff'],
-    ['Écrase Goombas et Koopas (+200 pts)...', '#fff'],
-    ['MAIS NE TOUCHE JAMAIS LES SPINYS (rouges à pointes) !', '#ff8080'],
+    ['BLOCS À POUVOIRS (frappe-les par en dessous)', '#eaa221'],
+    ['? donne une pièce — ★ donne l ÉTOILE : invincible 9 s,', '#fff'],
+    ['tu écrases tous les ennemis au contact (sauf les boss)', '#fff'],
+    ['♥ donne +1 VIE', '#fff'],
     ['', '#fff'],
-    ['MINI-BOSS EN FIN DE NIVEAU', '#eaa221'],
-    ['Saute 5 FOIS sur leur tête pour les vaincre', '#fff'],
-    ['Le contact par le côté ou le dessous est mortel', '#fff'],
+    ['Écrase Goombas et Koopas... MAIS JAMAIS LES SPINYS !', '#ff8080'],
+    ['NIVEAUX : chacun finit par un mini-boss (5 sauts sur la tête)', '#eaa221'],
+    ['Termine un niveau pour débloquer le suivant au menu', '#fff'],
     ['Le dernier boss est EXTRA DUR : ondes de choc et rafales !', '#ff8080'],
   ];
   lines.forEach(([txt, col], i) => {
