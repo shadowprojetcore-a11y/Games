@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mario 2D</title>
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    background: #111;
+    height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-family: monospace;
+    color: #ddd;
+  }
+  canvas {
+    image-rendering: pixelated;
+    border: 4px solid #333;
+    border-radius: 6px;
+    max-width: 96vw;
+    max-height: 82vh;
+  }
+  .help { margin-top: 12px; font-size: 14px; opacity: 0.75; text-align: center; }
+  .help b { color: #ffd700; }
+</style>
+</head>
+<body>
+<canvas id="game" width="960" height="512"></canvas>
+<div class="help">
+  <b>&#8592; &#8594;</b> se d&eacute;placer &nbsp;&nbsp; <b>&#8593; / Espace</b> sauter &nbsp;&nbsp;
+  &Eacute;crase les ennemis, prends les pi&egrave;ces, atteins le drapeau &mdash; <b>Entr&eacute;e</b> pour jouer<br>
+  Fin de niveau : <b>mini-boss</b> &agrave; 5 sauts sur la t&ecirc;te&hellip; le dernier est extra dur !<br>
+  Menu&nbsp;: <b>&uarr; &darr; + Entr&eacute;e</b> &mdash; Pause : <b>&Eacute;chap</b>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
